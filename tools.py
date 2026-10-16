@@ -16,12 +16,17 @@ GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 logger = logging.getLogger(__name__)
 
 
-def fetch_market_data(product_query):
-    """Fetch structured Google Shopping listings with provider-supplied prices."""
+def fetch_market_data(product_query, location=None):
+    """Fetch Google Shopping listings targeted to the requested locality."""
     if not SERPER_API_KEY:
         logger.error("SERPER_API_KEY is not configured")
         return None
     payload = {"q": f"{product_query} price India", "gl": "in", "hl": "en", "num": 20}
+    if location:
+        location_parts = [part.strip() for part in location.split(",")]
+        if location_parts[-1].casefold() != "india":
+            location_parts.append("India")
+        payload["location"] = ", ".join(location_parts)
     try:
         response = requests.post(
             "https://google.serper.dev/shopping",
