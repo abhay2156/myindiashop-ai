@@ -21,7 +21,6 @@ def fetch_market_data(product_query):
     if not SERPER_API_KEY:
         logger.error("SERPER_API_KEY is not configured")
         return None
-
     payload = {"q": f"{product_query} price India", "gl": "in", "hl": "en", "num": 20}
     try:
         response = requests.post(
@@ -88,11 +87,8 @@ def _ai_shopping_guidance(product_query, offers):
         "Do not state or infer prices, discounts, stock, delivery promises, "
         "seller policies, or product specifications. Do not recommend a seller. "
         "Use general checks such as matching pack size/model/size and confirming "
-        "the final delivered price. Return JSON with one key, buying_tips, an array of strings.
-"
-        f"Query: {product_query}
-"
-        f"Listings: {json.dumps(safe_items, ensure_ascii=False)}"
+        "the final delivered price. Return JSON with one key, buying_tips, an array of strings. "
+        f"Query: {product_query}. Listings: {json.dumps(safe_items, ensure_ascii=False)}"
     )
     try:
         completion = client.chat.completions.create(
@@ -133,7 +129,6 @@ def analyze_prices_with_ai(search_results, product_query):
             "rating": offer.get("rating"),
             "review_count": offer.get("review_count"),
         })
-
     if comparisons:
         recommendation = (
             f"Found {len(comparisons)} shopping listings for {product_query}. "
@@ -144,7 +139,6 @@ def analyze_prices_with_ai(search_results, product_query):
             "No listings with a verifiable displayed price and retailer link were found. "
             "Try adding a brand, model, or pack size."
         )
-
     return {
         "product_name": product_query,
         "best_recommendation": recommendation,
