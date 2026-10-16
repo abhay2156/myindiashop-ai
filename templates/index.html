@@ -1,116 +1,14 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MyIndiaShop AI - Price Comparison Assistant</title>
-    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
-</head>
-<body class="bg-slate-50 h-screen flex flex-col">
-    <!-- Header -->
-    <header class="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between">
-        <h1 class="text-xl font-bold">🇮🇳 MyIndiaShop AI Assistant</h1>
-        <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-full">Live Comparison</span>
-    </header>
-
-    <!-- Chat Container -->
-    <main id="chat-box" class="flex-1 overflow-y-auto p-4 max-w-2xl w-full mx-auto space-y-4">
-        <div class="flex items-start space-x-2">
-            <div class="bg-indigo-100 text-indigo-900 p-3 rounded-2xl max-w-[80%] text-sm shadow-sm">
-                Namaste! 🙏 I am your Indian e-commerce shopping and price comparison assistant. What product are you looking to buy today (e.g., smartphones, pressure cookers, running shoes)?
-            </div>
-        </div>
-    </main>
-
-    <!-- Input Box -->
-    <footer class="bg-white border-t border-slate-200 p-4 shadow-lg">
-        <form id="chat-form" class="max-w-2xl mx-auto flex gap-2">
-            <input
-                type="text"
-                id="user-input"
-                placeholder="Ask about prices, products, or deals..."
-                class="flex-1 border border-slate-300 rounded-xl px-4 py-2.5 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-sm"
-                autocomplete="off"
-                required
-            >
-            <button
-                type="submit"
-                class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-xl font-medium text-sm transition-colors shadow-sm">
-                Send
-            </button>
-        </form>
-    </footer>
-
-    <script>
-        const chatBox = document.getElementById('chat-box');
-        const chatForm = document.getElementById('chat-form');
-        const userInput = document.getElementById('user-input');
-
-        chatForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const text = userInput.value.trim();
-            if (!text) return;
-
-            // Append User Message
-            chatBox.innerHTML += `
-                <div class="flex justify-end">
-                    <div class="bg-indigo-600 text-white p-3 rounded-2xl max-w-[80%] text-sm shadow-sm">
-                        ${escapeHtml(text)}
-                    </div>
-                </div>`;
-            userInput.value = '';
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            // Loading state
-            const loadingId = 'loading-' + Date.now();
-            chatBox.innerHTML += `
-                <div id="${loadingId}" class="flex items-start space-x-2">
-                    <div class="bg-slate-200 text-slate-600 p-3 rounded-2xl text-sm animate-pulse">
-                        Searching best prices across India... 🛍️
-                    </div>
-                </div>`;
-            chatBox.scrollTop = chatBox.scrollHeight;
-
-            try {
-                const res = await fetch('/chat', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ prompt: text })
-                });
-                const data = await res.json();
-
-                document.getElementById(loadingId).remove();
-
-                if (res.ok) {
-                    chatBox.innerHTML += `
-                        <div class="flex items-start space-x-2">
-                            <div class="bg-white border border-slate-200 text-slate-800 p-3 rounded-2xl max-w-[85%] text-sm shadow-sm whitespace-pre-wrap">
-                                ${escapeHtml(data.response)}
-                            </div>
-                        </div>`;
-                } else {
-                    chatBox.innerHTML += `
-                        <div class="flex items-start space-x-2">
-                            <div class="bg-red-100 text-red-700 p-3 rounded-2xl text-sm">
-                                Error: ${data.detail || 'Something went wrong.'}
-                            </div>
-                        </div>`;
-                }
-            } catch (err) {
-                document.getElementById(loadingId).remove();
-                chatBox.innerHTML += `
-                    <div class="flex items-start space-x-2">
-                        <div class="bg-red-100 text-red-700 p-3 rounded-2xl text-sm">
-                            Network error. Please try again.
-                        </div>
-                    </div>`;
-            }
-            chatBox.scrollTop = chatBox.scrollHeight;
-        });
-
-        function escapeHtml(text) {
-            return text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-        }
-    </script>
-</body>
-</html>
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f8fc"><meta name="description" content="Compare shopping finds across India with MyIndiaShop AI."><title>MyIndiaShop AI — Smarter finds, better buys</title>
+<style>
+:root{color-scheme:light;--ink:#172033;--muted:#68738a;--line:#e7eaf1;--brand:#5a4ce2;--wash:#f7f8fc;--green:#13805e}*{box-sizing:border-box}body{margin:0;background:var(--wash);color:var(--ink);font:15px/1.5 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}button,input{font:inherit}button{cursor:pointer}.shell{max-width:1120px;margin:auto;padding:0 28px}.topbar{height:76px;display:flex;align-items:center;border-bottom:1px solid var(--line);background:#ffffffdc}.topbar-inner{display:flex;justify-content:space-between;align-items:center;width:100%}.brand{display:flex;align-items:center;gap:11px;font-weight:760;font-size:18px;letter-spacing:-.4px}.brand-icon{display:grid;place-items:center;width:38px;height:38px;border-radius:13px;background:#eeeaff;font-size:21px}.brand-name em{font-style:normal;color:var(--brand)}.live{display:flex;align-items:center;gap:8px;color:#59647a;font-size:13px}.live i{width:8px;height:8px;background:#24a875;border-radius:50%;box-shadow:0 0 0 4px #e2f5ed}main{padding:48px 0 36px}.hero{max-width:720px;margin:0 auto 32px;text-align:center}.eyebrow{display:inline-flex;padding:6px 12px;background:#eeecff;color:var(--brand);border-radius:99px;font-size:12px;font-weight:700}.hero h1{font-size:clamp(34px,5vw,53px);line-height:1.08;letter-spacing:-2px;margin:18px 0 12px}.hero h1 em{font-style:normal;color:var(--brand)}.hero p{color:var(--muted);font-size:17px;margin:0}.workspace{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(270px,.8fr);gap:20px;align-items:start}.panel{background:#fff;border:1px solid var(--line);border-radius:20px;box-shadow:0 8px 30px #28335b0a}.search-panel{padding:24px}.section-title{font-size:14px;font-weight:750;margin:0 0 13px}.categories{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:22px}.category{border:1px solid var(--line);background:#fff;border-radius:13px;padding:11px 7px;color:#4c566b}.category:hover{border-color:#b7b0ff;background:#faf9ff}.category[aria-pressed=true]{border-color:var(--brand);background:#f2f0ff;color:var(--brand);box-shadow:inset 0 0 0 1px var(--brand)}.category .icon{display:block;font-size:20px;margin-bottom:4px}.category .label{font-size:12px;font-weight:650}.search-form{display:flex;gap:10px}.input-wrap{position:relative;flex:1}.search-icon{position:absolute;left:15px;top:50%;transform:translateY(-50%);font-size:18px;color:#8490a6}.search-input{width:100%;height:52px;border:1px solid #dfe3ec;border-radius:13px;padding:0 15px 0 44px;outline:none}.search-input:focus{border-color:#8177ed;box-shadow:0 0 0 4px #efedff}.search-button{height:52px;border:0;border-radius:13px;padding:0 22px;background:var(--brand);color:#fff;font-weight:700}.search-button:disabled{opacity:.6;cursor:wait}.examples{margin-top:16px;color:var(--muted);font-size:12px}.examples button{border:0;background:none;color:#5b4cda;padding:2px 4px;font-size:12px}.side-panel{padding:22px}.side-heading{font-weight:750;font-size:15px;margin:0 0 17px}.benefit{display:flex;gap:11px;margin:14px 0;color:var(--muted);font-size:13px}.benefit b{display:block;color:var(--ink);font-size:13px}.check{color:var(--green);font-weight:800}.trust{border-top:1px solid var(--line);margin-top:18px;padding-top:15px;color:#778197;font-size:11px}#chat-box{max-width:840px;margin:24px auto 0;display:grid;gap:14px}.message{padding:16px 18px;border-radius:17px;max-width:88%;box-shadow:0 4px 16px #28335b08}.message.assistant{background:#fff;border:1px solid var(--line)}.message.user{justify-self:end;background:var(--brand);color:white;max-width:78%}.result-title{font-size:18px;color:#4436c6;font-weight:760}.offer{border:1px solid var(--line);border-radius:12px;padding:13px;margin-top:9px}.offer-top{display:flex;justify-content:space-between;gap:10px}.offer-price{font-size:19px;font-weight:760;color:#4436c6}.offer a{color:var(--brand);font-weight:650}.error{color:#a33434;background:#fff2f1}.loading{color:var(--muted);animation:pulse 1.2s infinite alternate}@keyframes pulse{to{opacity:.48}}footer{padding:10px 16px 25px;text-align:center;color:#8791a5;font-size:11px}
+@media(max-width:760px){.shell{padding:0 17px}.topbar{height:66px}.brand{font-size:16px}.live{font-size:11px}main{padding:34px 0 24px}.workspace{grid-template-columns:1fr}.side-panel{display:grid;grid-template-columns:1fr 1fr;column-gap:14px}.side-heading,.side-panel .trust{grid-column:1/-1}.benefit{margin:5px 0}}@media(max-width:480px){.shell{padding:0 13px}.live span:last-child{max-width:110px}.hero h1{font-size:36px;letter-spacing:-1.3px}.search-panel,.side-panel{padding:17px}.categories{grid-template-columns:repeat(2,1fr)}.category{display:flex;align-items:center;gap:9px;padding:10px;text-align:left}.category .icon{margin:0}.search-form{flex-direction:column}.search-button{width:100%}.side-panel{grid-template-columns:1fr}.side-heading,.side-panel .trust{grid-column:auto}.message{max-width:96%}}
+</style></head><body>
+<header class="topbar"><div class="shell topbar-inner"><div class="brand"><span class="brand-icon" aria-hidden="true">🛍️</span><span class="brand-name">MyIndiaShop <em>AI</em></span></div><div class="live"><i aria-hidden="true"></i><span>Shopping assistant for India</span></div></div></header>
+<main class="shell"><section class="hero"><span class="eyebrow">✦ YOUR SMARTER SHOPPING SIDEKICK</span><h1>Find your next great <em>buy.</em></h1><p>Compare products and discover helpful picks from across India.</p></section><section class="workspace" aria-label="Product search"><div class="panel search-panel"><h2 class="section-title">What are you shopping for?</h2><div class="categories" role="group" aria-label="Choose a product category">
+<button class="category" type="button" data-category="all" aria-pressed="true"><span class="icon">🛒</span><span class="label">Anything</span></button><button class="category" type="button" data-category="groceries" aria-pressed="false"><span class="icon">🥑</span><span class="label">Groceries</span></button><button class="category" type="button" data-category="electronics" aria-pressed="false"><span class="icon">🎧</span><span class="label">Electronics</span></button><button class="category" type="button" data-category="fashion" aria-pressed="false"><span class="icon">👟</span><span class="label">Fashion</span></button><button class="category" type="button" data-category="household" aria-pressed="false"><span class="icon">🪴</span><span class="label">Household</span></button></div>
+<form id="search-form" class="search-form"><label class="input-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="user-input" class="search-input" type="search" placeholder="Try wireless headphones" autocomplete="off" required aria-label="Product name"></label><button id="search-button" class="search-button" type="submit">Compare prices →</button></form><div class="examples">Popular searches: <button type="button" data-example="air fryer under 5000">air fryer</button> · <button type="button" data-example="running shoes for women">running shoes</button> · <button type="button" data-example="basmati rice 5 kg">basmati rice</button></div></div>
+<aside class="panel side-panel"><h2 class="side-heading">✨ A little help with the big choices</h2><div class="benefit"><span class="check">✓</span><div><b>Compare with confidence</b>See offers found across shopping sources.</div></div><div class="benefit"><span class="check">✓</span><div><b>Find the right fit</b>Get useful notes for your product search.</div></div><div class="benefit"><span class="check">✓</span><div><b>Shop your way</b>Search a category or type any product.</div></div><div class="trust">Prices and availability can change. Always confirm the final details with the retailer.</div></aside></section><section id="chat-box" aria-live="polite" aria-label="Search results"></section></main><footer>Made for curious shoppers across India · Prices are indicative and may change</footer>
+<script>
+const chatBox=document.getElementById("chat-box"),form=document.getElementById("search-form"),input=document.getElementById("user-input"),button=document.getElementById("search-button");let selectedCategory="all";document.querySelectorAll(".category").forEach(item=>item.addEventListener("click",()=>{selectedCategory=item.dataset.category;document.querySelectorAll(".category").forEach(c=>c.setAttribute("aria-pressed",String(c===item)))}));document.querySelectorAll("[data-example]").forEach(item=>item.addEventListener("click",()=>{input.value=item.dataset.example;input.focus()}));function escapeHtml(value){return String(value??"").replace(/[&<>"']/g,char=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[char])}function addMessage(content,kind){const node=document.createElement("div");node.className="message "+(kind||"assistant");node.innerHTML=content;chatBox.appendChild(node);node.scrollIntoView({behavior:"smooth",block:"nearest"});return node}function safeLink(value){try{const url=new URL(value);if(url.protocol==="https:"||url.protocol==="http:")return url.href}catch(_){}return null}function renderResults(result,status){const comparisons=Array.isArray(result.comparisons)?result.comparisons:[],tips=Array.isArray(result.buying_tips)?result.buying_tips:[];let html="<h2 class='result-title'>"+escapeHtml(result.product_name||"Price comparison")+"</h2><p>"+escapeHtml(result.best_recommendation||"Here are the shopping results we found.")+"</p>";if(comparisons.length){html+="<h3>Offers found</h3>";comparisons.forEach(item=>{const link=safeLink(item.link);html+="<article class='offer'><div class='offer-top'><strong>"+escapeHtml(item.platform||"Retailer")+"</strong><span class='offer-price'>"+escapeHtml(item.price||"Not available")+"</span></div><p>"+escapeHtml(item.remarks||"")+"</p>"+(link?"<a href='"+escapeHtml(link)+"' target='_blank' rel='noopener noreferrer'>View offer ↗</a>":"")+"</article>"})}else html+="<p>No reliable offers found yet. Try adding a brand or model.</p>";if(tips.length)html+="<h3>Buying tips</h3><ul>"+tips.map(t=>"<li>"+escapeHtml(t)+"</li>").join("")+"</ul>";html+="<p class='trust'>"+escapeHtml(status||"Prices may change. Confirm final details with the retailer.")+"</p>";addMessage(html)}form.addEventListener("submit",async event=>{event.preventDefault();const query=input.value.trim();if(!query)return;addMessage(escapeHtml(query),"user");input.value="";input.disabled=true;button.disabled=true;button.textContent="Searching…";const loading=addMessage("Looking across shopping results…","assistant loading");try{const response=await fetch("/api/search",{method:"POST",headers:{"Content-Type":"application/json","Accept":"application/json"},body:JSON.stringify({query,category:selectedCategory})});const payload=await response.json();if(!response.ok||!payload.success)throw new Error(payload.error||"Request failed ("+response.status+").");renderResults(payload.data||{},payload.price_status)}catch(error){addMessage("<strong>Search failed.</strong> "+escapeHtml(error.message||"Please try again."),"assistant error")}finally{loading.remove();input.disabled=false;button.disabled=false;button.textContent="Compare prices →";input.focus()}})
+</script></body></html>
