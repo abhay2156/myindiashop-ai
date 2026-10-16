@@ -143,8 +143,17 @@ def chat_with_agent(req: QueryRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Groq client not initialized.")
     try:
+        # Dynamically fetch available models from Groq at runtime so it never hardcodes a bad name
+        models_response = client.models.list()
+        available_models = [m.id for m in models_response.data]
+        logger.info(f"Dynamic available models from API: {available_models}")
+
+        # Pick the first available chat model, or fallback safely
+        target_model = available_models[0] if available_models else "openai/gpt-oss-20b"
+        logger.info(f"Selected runtime model: {target_model}")
+
         completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b",  # Active, supported model
+            model=target_model,
             messages=[
                 {
                     "role": "system",
@@ -155,8 +164,7 @@ def chat_with_agent(req: QueryRequest):
                     )
                 },
                 {"role": "user", "content": req.prompt}
-            ],
-            max_tokens=1024
+            ]
         )
         return {"response": completion.choices[0].message.content}
     except Exception as e:
