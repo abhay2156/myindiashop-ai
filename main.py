@@ -139,11 +139,6 @@ HTML_CONTENT = """
 </html>
 """
 
-
-@app.get("/", response_class=HTMLResponse)
-def home():
-    return HTML_CONTENT
-
 @app.post("/chat")
 def chat_with_agent(req: QueryRequest):
     try:
