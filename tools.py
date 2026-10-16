@@ -90,7 +90,7 @@ def _provider_offers(search_results):
             continue
         title, price, source = item.get("title"), item.get("price"), item.get("source")
         link = _retailer_product_url(item, title, source)
-        link = _retailer_product_url(item, title, source)
+        
         if not all(isinstance(value, str) and value.strip() for value in (title, price, source)) or not link:
             continue
         offer = {"title": title.strip(), "platform": source.strip(), "price": price.strip(), "link": link}
