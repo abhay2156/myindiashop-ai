@@ -71,8 +71,8 @@ def _retailer_product_url(item, title, source):
     if not (host == "google.com" or host.endswith(".google.com") or host == "google.co.in" or host.endswith(".google.co.in")):
         return provider_link
 
-    query = quote_plus(title.strip())
-    retailer = source.casefold()
+    query = quote_plus(str(title or "").strip())
+    retailer = str(source or "").casefold()
     if "bigbasket" in retailer:
         return f"https://www.bigbasket.com/ps/?q={query}"
     if "flipkart" in retailer:
