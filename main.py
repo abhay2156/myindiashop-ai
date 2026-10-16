@@ -1,23 +1,26 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
 from groq import Groq
 
-# Configure logging to see errors clearly in AIC Cloud logs
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-if not GROQ_API_KEY:
-    logger.error("CRITICAL ERROR: GROQ_API_KEY is missing from environment variables.")
-
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 app = FastAPI()
+
+
+@app.on_event("startup")
+def startup_event():
+    logger.info("=== REGISTERED ROUTES ==:")
+    for route in app.routes:
+        logger.info(f"Route: {route.path} | Methods: {getattr(route, 'methods', None)}")
 
 
 class QueryRequest(BaseModel):
@@ -152,9 +155,8 @@ def home():
 @app.post("/chat")
 def chat_with_agent(req: QueryRequest):
     if not client:
-        raise HTTPException(status_code=500, detail="Groq client not initialized. Check API Key.")
+        raise HTTPException(status_code=500, detail="Groq client not initialized.")
     try:
-        logger.info(f"Received prompt: {req.prompt}")
         completion = client.chat.completions.create(
             model="llama-3.3-70b-versatile",
             messages=[
@@ -169,8 +171,7 @@ def chat_with_agent(req: QueryRequest):
                 {"role": "user", "content": req.prompt}
             ]
         )
-        answer = completion.choices[0].message.content
-        return {"response": answer}
+        return {"response": completion.choices[0].message.content}
     except Exception as e:
-        logger.error(f"Error during chat completion: {str(e)}")
+        logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
