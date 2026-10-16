@@ -151,14 +151,13 @@ HTML_CONTENT = """
 def home():
     return HTML_CONTENT
 
-
 @app.post("/chat")
 def chat_with_agent(req: QueryRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Groq client not initialized.")
     try:
         completion = client.chat.completions.create(
-            model="openai/gpt-oss-20b",  # Universally supported active model on Groq
+            model="llama-3.1-8b-instant",  # Universally available Groq model
             messages=[
                 {
                     "role": "system",
