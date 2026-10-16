@@ -22,19 +22,11 @@ def fetch_market_data(product_query):
         logger.error("SERPER_API_KEY is not configured")
         return None
 
-    payload = {
-        "q": f"{product_query} price India",
-        "gl": "in",
-        "hl": "en",
-        "num": 20,
-    }
+    payload = {"q": f"{product_query} price India", "gl": "in", "hl": "en", "num": 20}
     try:
         response = requests.post(
             "https://google.serper.dev/shopping",
-            headers={
-                "X-API-KEY": SERPER_API_KEY.strip(),
-                "Content-Type": "application/json",
-            },
+            headers={"X-API-KEY": SERPER_API_KEY.strip(), "Content-Type": "application/json"},
             json=payload,
             timeout=20,
         )
@@ -67,20 +59,11 @@ def _provider_offers(search_results):
     for item in search_results.get("shopping", []):
         if not isinstance(item, dict):
             continue
-        title = item.get("title")
-        price = item.get("price")
-        source = item.get("source")
+        title, price, source = item.get("title"), item.get("price"), item.get("source")
         link = _valid_http_url(item.get("link"))
-        if not all(isinstance(value, str) and value.strip() for value in (title, price, source)):
+        if not all(isinstance(value, str) and value.strip() for value in (title, price, source)) or not link:
             continue
-        if not link:
-            continue
-        offer = {
-            "title": title.strip(),
-            "platform": source.strip(),
-            "price": price.strip(),
-            "link": link,
-        }
+        offer = {"title": title.strip(), "platform": source.strip(), "price": price.strip(), "link": link}
         delivery = item.get("delivery")
         if isinstance(delivery, str) and delivery.strip():
             offer["delivery"] = delivery.strip()
@@ -104,12 +87,12 @@ def _ai_shopping_guidance(product_query, offers):
         "Give up to two concise shopping checks for this product query. "
         "Do not state or infer prices, discounts, stock, delivery promises, "
         "seller policies, or product specifications. Do not recommend a seller. "
-        "Use only general checks such as matching pack size/model/size and "
-        "confirming the final delivered price. Return JSON with one key: "
-        "buying_tips, an array of strings.
+        "Use general checks such as matching pack size/model/size and confirming "
+        "the final delivered price. Return JSON with one key, buying_tips, an array of strings.
 "
         f"Query: {product_query}
-Listings: {json.dumps(safe_items, ensure_ascii=False)}"
+"
+        f"Listings: {json.dumps(safe_items, ensure_ascii=False)}"
     )
     try:
         completion = client.chat.completions.create(
@@ -120,6 +103,8 @@ Listings: {json.dumps(safe_items, ensure_ascii=False)}"
         )
         result = json.loads(completion.choices[0].message.content)
         tips = result.get("buying_tips", [])
+        if not isinstance(tips, list):
+            return []
         return [tip.strip() for tip in tips[:2] if isinstance(tip, str) and tip.strip()]
     except Exception:
         logger.exception("Groq guidance unavailable; returning provider data without AI tips")
