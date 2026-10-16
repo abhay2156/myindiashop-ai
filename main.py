@@ -31,12 +31,11 @@ def chat_with_agent(req: QueryRequest):
             model="llama-3.1-8b-instant",  # Active, fast production model
             messages=[
                 {
+                    {
                     "role": "system",
-                    "content": (
-                        "You are MyIndiaShop AI, a friendly and expert e-commerce comparison assistant "
-                        "specialized in the Indian market (Flipkart, Amazon India, Myntra, Croma, etc.). "
-                        "Help users find the best deals, compare product prices, features, and provide practical shopping advice."
-                    )
+                    "content": "You are MyIndiaShop AI, an expert e-commerce comparison assistant for India."
+                },
+                {"role": "user", "content": req.prompt}
                 },
                 {"role": "user", "content": req.prompt}
             ],
