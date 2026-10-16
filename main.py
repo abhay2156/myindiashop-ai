@@ -15,8 +15,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 app = FastAPI()
 
+
 class QueryRequest(BaseModel):
     prompt: str
+
 
 HTML_CONTENT = """
 <!DOCTYPE html>
@@ -134,39 +136,43 @@ HTML_CONTENT = """
 </html>
 """
 
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTML_CONTENT
+
 
 @app.post("/chat")
 def chat_with_agent(req: QueryRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Groq client not initialized.")
-    try:
-        # Dynamically fetch available models from Groq at runtime so it never hardcodes a bad name
-        models_response = client.models.list()
-        available_models = [m.id for m in models_response.data]
-        logger.info(f"Dynamic available models from API: {available_models}")
 
-        # Pick the first available chat model, or fallback safely
-        target_model = available_models[0] if available_models else "openai/gpt-oss-20b"
-        logger.info(f"Selected runtime model: {target_model}")
+    # List of active production models to cycle through automatically
+    candidate_models = ["openai/gpt-oss-120b", "openai/gpt-oss-20b", "llama-3.1-8b-instant"]
 
-        completion = client.chat.completions.create(
-            model=target_model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are MyIndiaShop AI, a friendly and expert e-commerce comparison assistant "
-                        "specialized in the Indian market (Flipkart, Amazon India, Myntra, Croma, etc.). "
-                        "Help users find the best deals, compare product prices, features, and provide practical shopping advice."
-                    )
-                },
-                {"role": "user", "content": req.prompt}
-            ]
-        )
-        return {"response": completion.choices[0].message.content}
-    except Exception as e:
-        logger.error(f"Chat error: {str(e)}")
-        raise HTTPException(status_code=500, detail=str(e))
+    last_exception = None
+    for model_name in candidate_models:
+        try:
+            logger.info(f"Attempting chat completion with model: {model_name}")
+            completion = client.chat.completions.create(
+                model=model_name,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are MyIndiaShop AI, a friendly and expert e-commerce comparison assistant "
+                            "specialized in the Indian market (Flipkart, Amazon India, Myntra, Croma, etc.). "
+                            "Help users find the best deals, compare product prices, features, and provide practical shopping advice."
+                        )
+                    },
+                    {"role": "user", "content": req.prompt}
+                ]
+            )
+            return {"response": completion.choices[0].message.content}
+        except Exception as e:
+            logger.warning(f"Model {model_name} failed: {str(e)}")
+            last_exception = e
+            continue
+
+    logger.error(f"All fallback models failed. Last error: {str(last_exception)}")
+    raise HTTPException(status_code=500, detail=str(last_exception))
