@@ -23,7 +23,10 @@ def fetch_market_data(product_query, location=None):
         return None
     payload = {"q": f"{product_query} price India", "gl": "in", "hl": "en", "num": 20}
     if location:
-        payload["location"] = location
+        location_parts = [part.strip() for part in location.split(",")]
+        if location_parts[-1].casefold() != "india":
+            location_parts.append("India")
+        payload["location"] = ", ".join(location_parts)
     try:
         response = requests.post(
             "https://google.serper.dev/shopping",
