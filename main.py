@@ -149,7 +149,7 @@ def home():
 def chat_with_agent(req: QueryRequest):
     try:
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model="openai/gpt-oss-20b",  # Active, supported Groq model
             messages=[
                 {
                     "role": "system",
@@ -162,7 +162,7 @@ def chat_with_agent(req: QueryRequest):
                 {"role": "user", "content": req.prompt}
             ],
             temperature=0.7,
-            max_tokens=1024
+            max_completion_tokens=1024
         )
         answer = completion.choices[0].message.content
         return {"response": answer}
