@@ -1,91 +1,168 @@
-import os
 import json
-import traceback
-import requests
-from groq import Groq
-from dotenv import load_dotenv
+import logging
+import os
 from pathlib import Path
+from urllib.parse import urlparse
 
-# Explicitly find and load the .env file from the project root
-env_path = Path(__file__).resolve().parent / '.env'
-load_dotenv(dotenv_path=env_path)
+import requests
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv(Path(__file__).resolve().parent / ".env")
 
 SERPER_API_KEY = os.getenv("SERPER_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
+logger = logging.getLogger(__name__)
 
 
 def fetch_market_data(product_query):
-    """Fetches live search results for Indian retail stores via Serper API."""
-    url = "https://google.serper.dev/search"
-
+    """Fetch structured Google Shopping listings with provider-supplied prices."""
     if not SERPER_API_KEY:
-        print("ERROR: SERPER_API_KEY is missing!")
+        logger.error("SERPER_API_KEY is not configured")
         return None
 
-    payload = json.dumps({
-        "q": f"{product_query} price buy online India Amazon Flipkart Croma Reliance Digital",
+    payload = {
+        "q": f"{product_query} price India",
         "gl": "in",
         "hl": "en",
-        "num": 10
-    })
-
-    headers = {
-        'X-API-KEY': SERPER_API_KEY.strip(),
-        'Content-Type': 'application/json'
+        "num": 20,
     }
-
     try:
-        response = requests.post(url, headers=headers, data=payload, timeout=15)
+        response = requests.post(
+            "https://google.serper.dev/shopping",
+            headers={
+                "X-API-KEY": SERPER_API_KEY.strip(),
+                "Content-Type": "application/json",
+            },
+            json=payload,
+            timeout=20,
+        )
         response.raise_for_status()
-        return response.json()
-    except Exception as e:
-        print(f"Error fetching search data: {e}")
-        traceback.print_exc()
+        data = response.json()
+        if not isinstance(data, dict):
+            return None
+        data["shopping"] = data.get("shopping") or []
+        return data
+    except requests.RequestException:
+        logger.exception("Shopping search provider request failed")
         return None
+    except ValueError:
+        logger.exception("Shopping search provider returned invalid JSON")
+        return None
+
+
+def _valid_http_url(value):
+    if not isinstance(value, str):
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return value
+
+
+def _provider_offers(search_results):
+    """Keep only offers with an explicit title, price, seller, and safe link."""
+    offers = []
+    for item in search_results.get("shopping", []):
+        if not isinstance(item, dict):
+            continue
+        title = item.get("title")
+        price = item.get("price")
+        source = item.get("source")
+        link = _valid_http_url(item.get("link"))
+        if not all(isinstance(value, str) and value.strip() for value in (title, price, source)):
+            continue
+        if not link:
+            continue
+        offer = {
+            "title": title.strip(),
+            "platform": source.strip(),
+            "price": price.strip(),
+            "link": link,
+        }
+        delivery = item.get("delivery")
+        if isinstance(delivery, str) and delivery.strip():
+            offer["delivery"] = delivery.strip()
+        rating = item.get("rating")
+        if isinstance(rating, (int, float)) and 0 <= rating <= 5:
+            offer["rating"] = rating
+        review_count = item.get("ratingCount") or item.get("reviews")
+        if isinstance(review_count, int) and review_count >= 0:
+            offer["review_count"] = review_count
+        offers.append(offer)
+    return offers
+
+
+def _ai_shopping_guidance(product_query, offers):
+    """Use Groq for cautious general guidance, never to create offer facts."""
+    if not GROQ_API_KEY:
+        return []
+    client = Groq(api_key=GROQ_API_KEY.strip())
+    safe_items = [{"title": item["title"], "seller": item["platform"]} for item in offers[:10]]
+    prompt = (
+        "Give up to two concise shopping checks for this product query. "
+        "Do not state or infer prices, discounts, stock, delivery promises, "
+        "seller policies, or product specifications. Do not recommend a seller. "
+        "Use only general checks such as matching pack size/model/size and "
+        "confirming the final delivered price. Return JSON with one key: "
+        "buying_tips, an array of strings.
+"
+        f"Query: {product_query}
+Listings: {json.dumps(safe_items, ensure_ascii=False)}"
+    )
+    try:
+        completion = client.chat.completions.create(
+            model=GROQ_MODEL,
+            messages=[{"role": "user", "content": prompt}],
+            response_format={"type": "json_object"},
+            max_completion_tokens=180,
+        )
+        result = json.loads(completion.choices[0].message.content)
+        tips = result.get("buying_tips", [])
+        return [tip.strip() for tip in tips[:2] if isinstance(tip, str) and tip.strip()]
+    except Exception:
+        logger.exception("Groq guidance unavailable; returning provider data without AI tips")
+        return []
 
 
 def analyze_prices_with_ai(search_results, product_query):
-    """Uses Groq LLM to dynamically construct structured product & store deal data."""
-    if not GROQ_API_KEY:
-        print("ERROR: GROQ_API_KEY is missing!")
+    """Return provider-grounded offers; Groq may add general checks only."""
+    if not isinstance(search_results, dict):
         return None
+    offers = _provider_offers(search_results)
+    comparisons = []
+    for offer in offers:
+        remarks = offer.get("delivery", "")
+        if offer.get("rating") is not None:
+            rating_note = f"Rated {offer['rating']}/5"
+            if offer.get("review_count"):
+                rating_note += f" from {offer['review_count']} ratings"
+            remarks = f"{remarks} · {rating_note}" if remarks else rating_note
+        comparisons.append({
+            "title": offer["title"],
+            "platform": offer["platform"],
+            "price": offer["price"],
+            "link": offer["link"],
+            "remarks": remarks,
+            "rating": offer.get("rating"),
+            "review_count": offer.get("review_count"),
+        })
 
-    client = Groq(api_key=GROQ_API_KEY.strip())
-
-    prompt = f"""
-    You are 'MyIndiaShop AI' / 'TolMolKe', an intelligent market price aggregator for India.
-    Analyze the raw organic search data provided below for the search: '{product_query}'.
-
-    Construct a structured JSON response following this EXACT JSON schema:
-    {{
-      "product_name": "{product_query}",
-      "best_recommendation": "A short, crisp 1-2 sentence recommendation on where to get the best deal.",
-      "comparisons": [
-        {{
-          "platform": "Platform Name (e.g., Amazon India, Flipkart, Croma, Reliance Digital)",
-          "price": "Price in INR (e.g. ₹69,900)",
-          "link": "Direct link from search results or homepage",
-          "remarks": "Brief stock state, discount, or payment benefit"
-        }}
-      ],
-      "buying_tips": [
-        "Tip 1 regarding credit card discounts or exchange offers",
-        "Tip 2 regarding warranty, trade-in, or refurbished deals"
-      ]
-    }}
-
-    Raw Search Data:
-    {json.dumps(search_results)}
-    """
-
-    try:
-        completion = client.chat.completions.create(
-            model="openai/gpt-oss-120b",  # Using the primary versatile Groq model
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"}
+    if comparisons:
+        recommendation = (
+            f"Found {len(comparisons)} shopping listings for {product_query}. "
+            "Match the exact product or pack size, then confirm delivery and final price with the retailer."
         )
-        return json.loads(completion.choices[0].message.content)
-    except Exception as e:
-        print(f"Error executing Groq AI Data Binding: {e}")
-        traceback.print_exc()
-        return None
+    else:
+        recommendation = (
+            "No listings with a verifiable displayed price and retailer link were found. "
+            "Try adding a brand, model, or pack size."
+        )
+
+    return {
+        "product_name": product_query,
+        "best_recommendation": recommendation,
+        "comparisons": comparisons,
+        "buying_tips": _ai_shopping_guidance(product_query, offers),
+    }
