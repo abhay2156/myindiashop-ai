@@ -80,7 +80,7 @@ def analyze_prices_with_ai(search_results, product_query):
 
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",  # Using the primary versatile Groq model
+            model="openai/gpt-oss-120b",  # Using the primary versatile Groq model
             messages=[{"role": "user", "content": prompt}],
             response_format={"type": "json_object"}
         )
