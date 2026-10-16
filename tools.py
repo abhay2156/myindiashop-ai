@@ -3,6 +3,7 @@ import logging
 import os
 from pathlib import Path
 from urllib.parse import urlparse
+from urllib.parse import quote_plus
 
 import requests
 from dotenv import load_dotenv
@@ -56,6 +57,30 @@ def _valid_http_url(value):
         return None
     return value
 
+def _retailer_product_url(item, title, source):
+    """Prefer a direct product URL; replace Google Shopping links with retailer search URLs."""
+    for key in ("productLink", "product_link", "url"):
+        direct = _valid_http_url(item.get(key))
+        if direct:
+            return direct
+
+    provider_link = _valid_http_url(item.get("link"))
+    if not provider_link:
+        return None
+    host = (urlparse(provider_link).hostname or "").lower()
+    if not (host == "google.com" or host.endswith(".google.com") or host == "google.co.in" or host.endswith(".google.co.in")):
+        return provider_link
+
+    query = quote_plus(title.strip())
+    retailer = source.casefold()
+    if "bigbasket" in retailer:
+        return f"https://www.bigbasket.com/ps/?q={query}"
+    if "flipkart" in retailer:
+        return f"https://www.flipkart.com/search?q={query}"
+    if "amazon" in retailer:
+        return f"https://www.amazon.in/s?k={query}"
+    return provider_link
+
 
 def _provider_offers(search_results):
     """Keep only offers with an explicit title, price, seller, and safe link."""
@@ -64,7 +89,8 @@ def _provider_offers(search_results):
         if not isinstance(item, dict):
             continue
         title, price, source = item.get("title"), item.get("price"), item.get("source")
-        link = _valid_http_url(item.get("link"))
+        link = _retailer_product_url(item, title, source)
+        link = _retailer_product_url(item, title, source)
         if not all(isinstance(value, str) and value.strip() for value in (title, price, source)) or not link:
             continue
         offer = {"title": title.strip(), "platform": source.strip(), "price": price.strip(), "link": link}
