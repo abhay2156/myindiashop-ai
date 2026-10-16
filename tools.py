@@ -79,6 +79,23 @@ def _retailer_product_url(item, title, source):
         return f"https://www.flipkart.com/search?q={query}"
     if "amazon" in retailer:
         return f"https://www.amazon.in/s?k={query}"
+    retailer_search_urls = {
+        "jiomart": f"https://www.jiomart.com/search/{query}",
+        "zepto": f"https://www.zepto.com/search?query={query}",
+        "blinkit": f"https://blinkit.com/s/?q={query}",
+        "myntra": f"https://www.myntra.com/search/{query}",
+        "ajio": f"https://www.ajio.com/search/?text={query}",
+        "croma": f"https://www.croma.com/search/?text={query}",
+        "reliance digital": f"https://www.reliancedigital.in/search?q={query}",
+        "nykaa": f"https://www.nykaa.com/search/result/?q={query}",
+        "tata cliq": f"https://www.tatacliq.com/search/?searchCategory=all&text={query}",
+        "meesho": f"https://www.meesho.com/search?q={query}",
+        "snapdeal": f"https://www.snapdeal.com/search?keyword={query}",
+        "starquik": f"https://www.starquik.com/search?q={query}",
+    }
+    for retailer_name, search_url in retailer_search_urls.items():
+        if retailer_name in retailer:
+            return search_url
     return provider_link
 
 
