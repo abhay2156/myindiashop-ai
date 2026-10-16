@@ -33,6 +33,13 @@ def search_api():
         return jsonify({"success": False, "error": "Please enter a product name."}), 400
     product_query = product_query.strip()
 
+    location = data.get("location", "")
+    if not isinstance(location, str) or not location.strip():
+        return jsonify({"success": False, "error": "Enter a city or locality to see nearby shopping results."}), 400
+    location = location.strip()
+    if len(location) > 120:
+        return jsonify({"success": False, "error": "Please enter a shorter city or locality."}), 400
+
     category = data.get("category", "all")
     if not isinstance(category, str) or category not in CATEGORY_HINTS:
         return jsonify({"success": False, "error": "Please choose a valid product category."}), 400
@@ -40,7 +47,7 @@ def search_api():
     category_hint = CATEGORY_HINTS[category]
     search_query = f"{category_hint} {product_query}".strip()
     try:
-        search_results = fetch_market_data(search_query)
+        search_results = fetch_market_data(search_query, location=location)
         if not search_results:
             return jsonify({"success": False, "error": "Could not retrieve shopping results. Please try again."}), 502
 
@@ -51,7 +58,8 @@ def search_api():
         return jsonify({
             "success": True,
             "data": structured_data,
-            "price_status": "Prices come from search results and may change. Verify the final price on the retailer's website.",
+            "location": location,
+            "price_status": f"Search results targeted to {location}. Availability and final checkout price may vary by retailer.",
         }), 200
     except Exception:
         app.logger.exception("Unexpected error in product search")
