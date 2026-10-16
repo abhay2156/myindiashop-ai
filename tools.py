@@ -80,7 +80,7 @@ def _retailer_product_url(item, title, source):
     if "amazon" in retailer:
         return f"https://www.amazon.in/s?k={query}"
     retailer_search_urls = {
-        "jiomart": f"https://www.jiomart.com/search/{query}",
+        "jiomart": f"https://www.jiomart.com/products?q={query}",
         "zepto": f"https://www.zepto.com/search?query={query}",
         "blinkit": f"https://blinkit.com/s/?q={query}",
         "myntra": f"https://www.myntra.com/search/{query}",
