@@ -1,6 +1,6 @@
 import os
 import logging
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from dotenv import load_dotenv
@@ -16,15 +16,21 @@ client = Groq(api_key=GROQ_API_KEY) if GROQ_API_KEY else None
 app = FastAPI()
 
 
-@app.on_event("startup")
-def startup_event():
-    logger.info("=== REGISTERED ROUTES ==:")
-    for route in app.routes:
-        logger.info(f"Route: {route.path} | Methods: {getattr(route, 'methods', None)}")
-
-
 class QueryRequest(BaseModel):
     prompt: str
+
+
+@app.get("/debug-models")
+def debug_models():
+    """Diagnostic route to check which models your API key is actually allowed to use."""
+    if not client:
+        return {"error": "Groq client not initialized. Missing API key?"}
+    try:
+        models = client.models.list()
+        model_ids = [m.id for m in models.data]
+        return {"available_models": model_ids}
+    except Exception as e:
+        return {"error": str(e)}
 
 
 HTML_CONTENT = """
@@ -40,14 +46,17 @@ HTML_CONTENT = """
     <!-- Header -->
     <header class="bg-indigo-600 text-white p-4 shadow-md flex items-center justify-between">
         <h1 class="text-xl font-bold">🇮🇳 MyIndiaShop AI Assistant</h1>
-        <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-full">Live Comparison</span>
+        <div class="flex gap-2">
+            <button onclick="checkModels()" class="text-xs bg-indigo-500 hover:bg-indigo-700 px-2.5 py-1 rounded-full transition-colors">Check API Models</button>
+            <span class="text-xs bg-indigo-500 px-2.5 py-1 rounded-full">Live Comparison</span>
+        </div>
     </header>
 
     <!-- Chat Container -->
     <main id="chat-box" class="flex-1 overflow-y-auto p-4 max-w-2xl w-full mx-auto space-y-4">
         <div class="flex items-start space-x-2">
             <div class="bg-indigo-100 text-indigo-900 p-3 rounded-2xl max-w-[80%] text-sm shadow-sm">
-                Namaste! 🙏 I am your Indian e-commerce shopping and price comparison assistant. What product are you looking to buy today (e.g., smartphones, pressure cookers, running shoes)?
+                Namaste! 🙏 I am your Indian e-commerce shopping and price comparison assistant. What product are you looking to buy today?
             </div>
         </div>
     </main>
@@ -76,12 +85,23 @@ HTML_CONTENT = """
         const chatForm = document.getElementById('chat-form');
         const userInput = document.getElementById('user-input');
 
+        async function checkModels() {
+            chatBox.innerHTML += `<div class="text-xs text-indigo-600 italic">Checking allowed models for your API key...</div>`;
+            try {
+                const res = await fetch('/debug-models');
+                const data = await res.json();
+                chatBox.innerHTML += `<div class="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded-xl text-xs whitespace-pre-wrap">Available Models: ${JSON.stringify(data, null, 2)}</div>`;
+            } catch (err) {
+                chatBox.innerHTML += `<div class="text-xs text-red-600">Failed to fetch debug info.</div>`;
+            }
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
         chatForm.addEventListener('submit', async (e) => {
             e.preventDefault();
             const text = userInput.value.trim();
             if (!text) return;
 
-            // Append User Message
             chatBox.innerHTML += `
                 <div class="flex justify-end">
                     <div class="bg-indigo-600 text-white p-3 rounded-2xl max-w-[80%] text-sm shadow-sm">
@@ -91,7 +111,6 @@ HTML_CONTENT = """
             userInput.value = '';
             chatBox.scrollTop = chatBox.scrollHeight;
 
-            // Loading state
             const loadingId = 'loading-' + Date.now();
             chatBox.innerHTML += `
                 <div id="${loadingId}" class="flex items-start space-x-2">
@@ -108,7 +127,6 @@ HTML_CONTENT = """
                     body: JSON.stringify({ prompt: text })
                 });
                 const data = await res.json();
-
                 document.getElementById(loadingId).remove();
 
                 if (res.ok) {
@@ -151,26 +169,39 @@ HTML_CONTENT = """
 def home():
     return HTML_CONTENT
 
+
 @app.post("/chat")
 def chat_with_agent(req: QueryRequest):
     if not client:
         raise HTTPException(status_code=500, detail="Groq client not initialized.")
     try:
-        completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",  # Universally available Groq model
-            messages=[
-                {
-                    "role": "system",
-                    "content": (
-                        "You are MyIndiaShop AI, a friendly and expert e-commerce comparison assistant "
-                        "specialized in the Indian market (Flipkart, Amazon India, Myntra, Croma, etc.). "
-                        "Help users find the best deals, compare product prices, features, and provide practical shopping advice."
-                    )
-                },
-                {"role": "user", "content": req.prompt}
-            ]
-        )
-        return {"response": completion.choices[0].message.content}
+        # Fallback list of major models to try automatically if one fails
+        models_to_try = ["llama-3.1-8b-instant", "llama3-8b-8192", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        last_error = None
+
+        for model_name in models_to_try:
+            try:
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are MyIndiaShop AI, a friendly and expert e-commerce comparison assistant "
+                                "specialized in the Indian market (Flipkart, Amazon India, Myntra, Croma, etc.). "
+                                "Help users find the best deals, compare product prices, features, and provide practical shopping advice."
+                            )
+                        },
+                        {"role": "user", "content": req.prompt}
+                    ]
+                )
+                return {"response": completion.choices[0].message.content}
+            except Exception as model_err:
+                last_error = str(model_err)
+                continue
+
+        raise HTTPException(status_code=500, detail=f"All models failed. Last error: {last_error}")
+
     except Exception as e:
         logger.error(f"Chat error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
