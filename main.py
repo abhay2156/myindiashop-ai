@@ -158,7 +158,7 @@ def chat_with_agent(req: QueryRequest):
         raise HTTPException(status_code=500, detail="Groq client not initialized.")
     try:
         completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
+            model="openai/gpt-oss-20b",  # Universally supported active model on Groq
             messages=[
                 {
                     "role": "system",
