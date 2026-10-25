@@ -248,4 +248,3 @@ def analyze_prices_with_ai(search_results, product_query):
         "comparisons": comparisons,
         "buying_tips": _ai_shopping_guidance(product_query, offers),
     }
-}
