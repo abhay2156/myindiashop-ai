@@ -55,6 +55,8 @@ FRESH_PRODUCE = (
 PROCESSED_PRODUCE_TERMS = (
     "ketchup", "sauce", "puree", "puree", "paste", "pickle", "chutney",
     "juice", "powder", "flakes", "chips", "fryums", "ready to eat",
+    "soup", "oats", "snack", "vadagam", "masala", "food colour", "food color",
+    "peeled", "canned", "dried", "sun dried", "sundried", "frozen",
 )
 
 
