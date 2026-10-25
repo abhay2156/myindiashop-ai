@@ -1,6 +1,8 @@
 import json
 import logging
 import os
+import math
+import re
 from pathlib import Path
 from urllib.parse import quote_plus, urlparse
 
@@ -94,12 +96,20 @@ def fetch_market_data(product_query, location=None):
             return None
 
         offers = []
+        fallback_links = {
+            "Amazon": "https://www.amazon.in/s?k=",
+            "Flipkart": "https://www.flipkart.com/search?q=",
+            "BigBasket": "https://www.bigbasket.com/ps/?q=",
+            "BlinkIt": "https://blinkit.com/s/?q=",
+            "Zepto": "https://www.zepto.com/search?query=",
+        }
         for platform in PLATFORMS:
             listings = results.get(platform, [])
             if isinstance(listings, dict):
                 listings = listings.get("products", [])
             if not isinstance(listings, list):
                 continue
+            platform_offers = []
             for item in listings:
                 if not isinstance(item, dict) or item.get("available") is False:
                     continue
@@ -107,22 +117,29 @@ def fetch_market_data(product_query, location=None):
                 price_value = item.get("offer_price", item.get("price"))
                 if isinstance(price_value, bool) or price_value is None:
                     continue
-                price = f"₹{price_value:,.2f}".rstrip("0").rstrip(".") if isinstance(price_value, (int, float)) else str(price_value).strip()
-                if not isinstance(title, str) or not title.strip() or not price:
+                try:
+                    if isinstance(price_value, (int, float)):
+                        numeric_price = float(price_value)
+                    elif isinstance(price_value, str):
+                        match = re.search(r"\d+(?:\.\d+)?", price_value.replace(",", ""))
+                        if not match:
+                            continue
+                        numeric_price = float(match.group())
+                    else:
+                        continue
+                except (TypeError, ValueError):
+                    continue
+                if not math.isfinite(numeric_price) or numeric_price <= 0:
+                    continue
+                price = "₹{:,.2f}".format(numeric_price).rstrip("0").rstrip(".")
+                if not isinstance(title, str) or not title.strip():
                     continue
                 quantity = item.get("quantity")
                 if isinstance(quantity, str) and quantity.strip():
-                    title = f"{title.strip()} · {quantity.strip()}"
+                    title = "{} · {}".format(title.strip(), quantity.strip())
                 platform_data = item.get("platform")
                 source = platform_data.get("name", platform) if isinstance(platform_data, dict) else platform
                 deeplink = _valid_http_url(item.get("deeplink") or item.get("url"))
-                fallback_links = {
-                    "Amazon": "https://www.amazon.in/s?k=",
-                    "Flipkart": "https://www.flipkart.com/search?q=",
-                    "BigBasket": "https://www.bigbasket.com/ps/?q=",
-                    "BlinkIt": "https://blinkit.com/s/?q=",
-                    "Zepto": "https://www.zepto.com/search?query=",
-                }
                 offer = {
                     "title": title.strip(),
                     "price": price,
@@ -136,7 +153,9 @@ def fetch_market_data(product_query, location=None):
                 count = item.get("rating_count", item.get("ratingCount"))
                 if isinstance(count, int) and count >= 0:
                     offer["ratingCount"] = count
-                offers.append(offer)
+                platform_offers.append((numeric_price, offer))
+            platform_offers.sort(key=lambda entry: entry[0])
+            offers.extend(offer for _, offer in platform_offers[:5])
         return {"shopping": offers}
     except requests.RequestException:
         logger.exception("QuickCommerce product search request failed")
