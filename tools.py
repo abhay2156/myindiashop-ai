@@ -2,51 +2,24 @@ import json
 import logging
 import os
 from pathlib import Path
-from urllib.parse import urlparse
-from urllib.parse import quote_plus
+from urllib.parse import quote_plus, urlparse
 
 import requests
 from dotenv import load_dotenv
 from groq import Groq
 
 load_dotenv(Path(__file__).resolve().parent / ".env")
-
-SERPER_API_KEY = os.getenv("SERPER_API_KEY")
+QUICKCOMMERCE_API_KEY = (
+    os.getenv("QUICKCOMMERCE_API_KEY")
+    or os.getenv("X_API_KEY")
+    or os.getenv("X-API-Key")
+    or os.getenv("X-API-KEY")
+)
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-20b")
 logger = logging.getLogger(__name__)
-
-
-def fetch_market_data(product_query, location=None):
-    """Fetch Google Shopping listings targeted to the requested locality."""
-    if not SERPER_API_KEY:
-        logger.error("SERPER_API_KEY is not configured")
-        return None
-    payload = {"q": f"{product_query} price India", "gl": "in", "hl": "en", "num": 20}
-    if location:
-        location_parts = [part.strip() for part in location.split(",")]
-        if location_parts[-1].casefold() != "india":
-            location_parts.append("India")
-        payload["location"] = ", ".join(location_parts)
-    try:
-        response = requests.post(
-            "https://google.serper.dev/shopping",
-            headers={"X-API-KEY": SERPER_API_KEY.strip(), "Content-Type": "application/json"},
-            json=payload,
-            timeout=20,
-        )
-        response.raise_for_status()
-        data = response.json()
-        if not isinstance(data, dict):
-            return None
-        data["shopping"] = data.get("shopping") or []
-        return data
-    except requests.RequestException:
-        logger.exception("Shopping search provider request failed")
-        return None
-    except ValueError:
-        logger.exception("Shopping search provider returned invalid JSON")
-        return None
+PLATFORMS = ("Amazon", "Flipkart", "BigBasket", "BlinkIt", "Zepto")
+_LOCATION_CACHE = {}
 
 
 def _valid_http_url(value):
@@ -57,46 +30,129 @@ def _valid_http_url(value):
         return None
     return value
 
+
+def _coordinates_for_location(location):
+    """Resolve an Indian city/locality to coordinates required by the API."""
+    cache_key = location.strip().casefold()
+    if cache_key in _LOCATION_CACHE:
+        return _LOCATION_CACHE[cache_key]
+    search_name = location.strip()
+    if "india" not in search_name.casefold():
+        search_name = f"{search_name}, India"
+    try:
+        response = requests.get(
+            "https://geocoding-api.open-meteo.com/v1/search",
+            params={"name": search_name, "count": 10, "language": "en", "format": "json"},
+            headers={"User-Agent": "MyIndiaShop/1.0"},
+            timeout=12,
+        )
+        response.raise_for_status()
+        data = response.json()
+        candidates = data.get("results") if isinstance(data, dict) else None
+        if not isinstance(candidates, list):
+            return None
+        place = next((item for item in candidates if isinstance(item, dict) and str(item.get("country_code", "")).upper() == "IN"), None)
+        if not place:
+            return None
+        coordinates = (float(place["latitude"]), float(place["longitude"]))
+        _LOCATION_CACHE[cache_key] = coordinates
+        return coordinates
+    except (requests.RequestException, ValueError, KeyError, TypeError):
+        logger.exception("Could not resolve the requested shopping location")
+        return None
+
+
+def fetch_market_data(product_query, location=None):
+    """Fetch live offers from Amazon, Flipkart, BigBasket, Blinkit, and Zepto."""
+    if not QUICKCOMMERCE_API_KEY:
+        logger.error("QuickCommerce API key is not configured")
+        return None
+    if not location:
+        return None
+    coordinates = _coordinates_for_location(location)
+    if not coordinates:
+        logger.warning("No India location match found for %r", location)
+        return None
+    try:
+        response = requests.get(
+            "https://api.quickcommerceapi.com/v1/groupsearch",
+            headers={"X-API-Key": QUICKCOMMERCE_API_KEY.strip()},
+            params={
+                "q": product_query,
+                "lat": coordinates[0],
+                "lon": coordinates[1],
+                "platforms": ",".join(PLATFORMS),
+            },
+            timeout=35,
+        )
+        response.raise_for_status()
+        body = response.json()
+        data = body.get("data") if isinstance(body, dict) else None
+        results = data.get("results") if isinstance(data, dict) else None
+        if not isinstance(results, dict):
+            logger.error("QuickCommerce API returned an unexpected search response")
+            return None
+
+        offers = []
+        for platform in PLATFORMS:
+            listings = results.get(platform, [])
+            if isinstance(listings, dict):
+                listings = listings.get("products", [])
+            if not isinstance(listings, list):
+                continue
+            for item in listings:
+                if not isinstance(item, dict) or item.get("available") is False:
+                    continue
+                title = item.get("name") or item.get("title")
+                price_value = item.get("offer_price", item.get("price"))
+                if isinstance(price_value, bool) or price_value is None:
+                    continue
+                price = f"₹{price_value:,.2f}".rstrip("0").rstrip(".") if isinstance(price_value, (int, float)) else str(price_value).strip()
+                if not isinstance(title, str) or not title.strip() or not price:
+                    continue
+                quantity = item.get("quantity")
+                if isinstance(quantity, str) and quantity.strip():
+                    title = f"{title.strip()} · {quantity.strip()}"
+                platform_data = item.get("platform")
+                source = platform_data.get("name", platform) if isinstance(platform_data, dict) else platform
+                deeplink = _valid_http_url(item.get("deeplink") or item.get("url"))
+                fallback_links = {
+                    "Amazon": "https://www.amazon.in/s?k=",
+                    "Flipkart": "https://www.flipkart.com/search?q=",
+                    "BigBasket": "https://www.bigbasket.com/ps/?q=",
+                    "BlinkIt": "https://blinkit.com/s/?q=",
+                    "Zepto": "https://www.zepto.com/search?query=",
+                }
+                offer = {
+                    "title": title.strip(),
+                    "price": price,
+                    "source": str(source),
+                    "productLink": deeplink or fallback_links[platform] + quote_plus(title.strip()),
+                }
+                if isinstance(platform_data, dict) and isinstance(platform_data.get("sla"), str):
+                    offer["delivery"] = platform_data["sla"]
+                if isinstance(item.get("rating"), (int, float)):
+                    offer["rating"] = item["rating"]
+                count = item.get("rating_count", item.get("ratingCount"))
+                if isinstance(count, int) and count >= 0:
+                    offer["ratingCount"] = count
+                offers.append(offer)
+        return {"shopping": offers}
+    except requests.RequestException:
+        logger.exception("QuickCommerce product search request failed")
+        return None
+    except ValueError:
+        logger.exception("QuickCommerce API returned invalid JSON")
+        return None
+
+
 def _retailer_product_url(item, title, source):
-    """Prefer a direct product URL; replace Google Shopping links with retailer search URLs."""
+    """Prefer a direct product URL; use the retailer search page as fallback."""
     for key in ("productLink", "product_link", "url"):
         direct = _valid_http_url(item.get(key))
         if direct:
             return direct
-
-    provider_link = _valid_http_url(item.get("link"))
-    if not provider_link:
-        return None
-    host = (urlparse(provider_link).hostname or "").lower()
-    if not (host == "google.com" or host.endswith(".google.com") or host == "google.co.in" or host.endswith(".google.co.in")):
-        return provider_link
-
-    query = quote_plus(str(title or "").strip())
-    retailer = str(source or "").casefold()
-    if "bigbasket" in retailer:
-        return f"https://www.bigbasket.com/ps/?q={query}"
-    if "flipkart" in retailer:
-        return f"https://www.flipkart.com/search?q={query}"
-    if "amazon" in retailer:
-        return f"https://www.amazon.in/s?k={query}"
-    retailer_search_urls = {
-        "jiomart": f"https://www.jiomart.com/products?q={query}",
-        "zepto": f"https://www.zepto.com/search?query={query}",
-        "blinkit": f"https://blinkit.com/s/?q={query}",
-        "myntra": f"https://www.myntra.com/search/{query}",
-        "ajio": f"https://www.ajio.com/search/?text={query}",
-        "croma": f"https://www.croma.com/search/?text={query}",
-        "reliance digital": f"https://www.reliancedigital.in/search?q={query}",
-        "nykaa": f"https://www.nykaa.com/search/result/?q={query}",
-        "tata cliq": f"https://www.tatacliq.com/search/?searchCategory=all&text={query}",
-        "meesho": f"https://www.meesho.com/search?q={query}",
-        "snapdeal": f"https://www.snapdeal.com/search?keyword={query}",
-        "starquik": f"https://www.starquik.com/search?q={query}",
-    }
-    for retailer_name, search_url in retailer_search_urls.items():
-        if retailer_name in retailer:
-            return search_url
-    return provider_link
+    return _valid_http_url(item.get("link"))
 
 
 def _provider_offers(search_results):
@@ -107,7 +163,6 @@ def _provider_offers(search_results):
             continue
         title, price, source = item.get("title"), item.get("price"), item.get("source")
         link = _retailer_product_url(item, title, source)
-        
         if not all(isinstance(value, str) and value.strip() for value in (title, price, source)) or not link:
             continue
         offer = {"title": title.strip(), "platform": source.strip(), "price": price.strip(), "link": link}
@@ -193,3 +248,4 @@ def analyze_prices_with_ai(search_results, product_query):
         "comparisons": comparisons,
         "buying_tips": _ai_shopping_guidance(product_query, offers),
     }
+}
