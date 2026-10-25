@@ -59,6 +59,10 @@ PROCESSED_PRODUCE_TERMS = (
     "murabba", "murraba", "murrabba", "puttupodi", "seed", "seeds", "beej",
     "herb", "herbal", "ayurvedic", "halwa", "cake", "cookies", "biscuits",
     "peeled", "canned", "dried", "sun dried", "sundried", "frozen",
+    "peeler", "peelers", "slicer", "slicers", "shredder", "shredders",
+    "grater", "graters", "scissor", "scissors", "cutter", "cutters",
+    "chopper", "choppers", "utensil", "utensils", "kitchenware",
+    "kitchen tool", "kitchen tools", "tortilla", "wrap", "wraps",
 )
 
 
