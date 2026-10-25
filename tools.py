@@ -56,6 +56,8 @@ PROCESSED_PRODUCE_TERMS = (
     "ketchup", "sauce", "puree", "puree", "paste", "pickle", "chutney",
     "juice", "powder", "flakes", "chips", "fryums", "ready to eat",
     "soup", "oats", "snack", "vadagam", "masala", "food colour", "food color",
+    "murabba", "murraba", "murrabba", "puttupodi", "seed", "seeds", "beej",
+    "herb", "herbal", "ayurvedic", "halwa", "cake", "cookies", "biscuits",
     "peeled", "canned", "dried", "sun dried", "sundried", "frozen",
 )
 
