@@ -7,7 +7,7 @@ from tools import fetch_market_data, analyze_prices_with_ai
 app = Flask(__name__)
 logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper())
 
-CATEGORIES = {"groceries", "electronics", "fashion", "household", "all"}
+CATEGORIES = {"groceries", "fresh_vegetables", "electronics", "fashion", "household", "all"}
 
 
 @app.route("/", methods=["GET"])
@@ -38,11 +38,10 @@ def search_api():
     if not isinstance(category, str) or category not in CATEGORIES:
         return jsonify({"success": False, "error": "Please choose a valid product category."}), 400
 
-    # Keep the user's product phrase intact; broad category words reduce
-    # retailer search relevance, especially for produce and groceries.
+    # Send only the product phrase to retailers so their search stays relevant.
     search_query = product_query
     try:
-        search_results = fetch_market_data(search_query, location=location)
+        search_results = fetch_market_data(search_query, location=location, category=category)
         if not search_results:
             return jsonify({"success": False, "error": "Could not retrieve shopping results. Please try again."}), 502
 
