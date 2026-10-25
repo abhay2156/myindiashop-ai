@@ -23,6 +23,59 @@ logger = logging.getLogger(__name__)
 PLATFORMS = ("Amazon", "Flipkart", "BigBasket", "BlinkIt", "Zepto")
 _LOCATION_CACHE = {}
 
+FRESH_PRODUCE = (
+    ("tomato", "tomatoes", "tamatar"),
+    ("potato", "potatoes", "aloo"),
+    ("onion", "onions", "pyaz"),
+    ("carrot", "carrots", "gajar"),
+    ("cucumber", "cucumbers", "kheera"),
+    ("cabbage", "patta gobhi"),
+    ("cauliflower", "gobi", "phool gobhi"),
+    ("brinjal", "eggplant", "baingan"),
+    ("okra", "lady finger", "bhindi"),
+    ("spinach", "palak"),
+    ("capsicum", "bell pepper", "shimla mirch"),
+    ("beans", "green beans", "french beans"),
+    ("peas", "green peas", "matar"),
+    ("garlic", "lehsun"),
+    ("ginger", "adrak"),
+    ("radish", "mooli"),
+    ("beetroot", "beet", "chukandar"),
+    ("pumpkin", "kaddu"),
+    ("bitter gourd", "karela"),
+    ("bottle gourd", "lauki"),
+    ("ridge gourd", "turai"),
+    ("coriander", "coriander leaves", "dhaniya"),
+    ("lettuce",),
+    ("broccoli",),
+    ("sweet potato", "shakarkand"),
+    ("spring onion",),
+    ("green chilli", "green chili", "hari mirch"),
+)
+PROCESSED_PRODUCE_TERMS = (
+    "ketchup", "sauce", "puree", "puree", "paste", "pickle", "chutney",
+    "juice", "powder", "flakes", "chips", "fryums", "ready to eat",
+)
+
+
+def _contains_term(text, term):
+    return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
+
+
+def _requested_produce_groups(query):
+    normalized = query.casefold()
+    matched = [
+        group for group in FRESH_PRODUCE
+        if any(_contains_term(normalized, term) for term in group)
+    ]
+    if matched:
+        return matched
+    if any(phrase in normalized for phrase in ("fresh vegetable", "fresh veg", "vegetables", "vegetable")):
+        return list(FRESH_PRODUCE)
+    return []
+
+
+
 
 def _valid_http_url(value):
     if not isinstance(value, str):
@@ -96,6 +149,7 @@ def fetch_market_data(product_query, location=None):
             return None
 
         offers = []
+        requested_produce = _requested_produce_groups(product_query)
         fallback_links = {
             "Amazon": "https://www.amazon.in/s?k=",
             "Flipkart": "https://www.flipkart.com/search?q=",
@@ -114,6 +168,15 @@ def fetch_market_data(product_query, location=None):
                 if not isinstance(item, dict) or item.get("available") is False:
                     continue
                 title = item.get("name") or item.get("title")
+                if requested_produce:
+                    normalized_title = title.casefold() if isinstance(title, str) else ""
+                    if any(_contains_term(normalized_title, term) for term in PROCESSED_PRODUCE_TERMS):
+                        continue
+                    if not any(
+                        any(_contains_term(normalized_title, term) for term in group)
+                        for group in requested_produce
+                    ):
+                        continue
                 price_value = item.get("offer_price", item.get("price"))
                 if isinstance(price_value, bool) or price_value is None:
                     continue
@@ -121,7 +184,7 @@ def fetch_market_data(product_query, location=None):
                     if isinstance(price_value, (int, float)):
                         numeric_price = float(price_value)
                     elif isinstance(price_value, str):
-                        match = re.search(r"\d+(?:\.\d+)?", price_value.replace(",", ""))
+                        match = re.search(r"-?\d+(?:\.\d+)?", price_value.replace(",", ""))
                         if not match:
                             continue
                         numeric_price = float(match.group())
