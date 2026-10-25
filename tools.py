@@ -117,7 +117,7 @@ def _coordinates_for_location(location):
         return None
 
 
-def fetch_market_data(product_query, location=None):
+def fetch_market_data(product_query, location=None, category="all"):
     """Fetch live offers from Amazon, Flipkart, BigBasket, Blinkit, and Zepto."""
     if not QUICKCOMMERCE_API_KEY:
         logger.error("QuickCommerce API key is not configured")
@@ -149,7 +149,7 @@ def fetch_market_data(product_query, location=None):
             return None
 
         offers = []
-        requested_produce = _requested_produce_groups(product_query)
+        requested_produce = _requested_produce_groups(product_query) if category == "fresh_vegetables" else []
         fallback_links = {
             "Amazon": "https://www.amazon.in/s?k=",
             "Flipkart": "https://www.flipkart.com/search?q=",
@@ -168,8 +168,19 @@ def fetch_market_data(product_query, location=None):
                 if not isinstance(item, dict) or item.get("available") is False:
                     continue
                 title = item.get("name") or item.get("title")
+                normalized_title = title.casefold() if isinstance(title, str) else ""
+                if category == "groceries":
+                    is_fresh_produce = any(
+                        _contains_term(normalized_title, term)
+                        for group in FRESH_PRODUCE for term in group
+                    )
+                    is_processed_product = any(
+                        _contains_term(normalized_title, term)
+                        for term in PROCESSED_PRODUCE_TERMS
+                    )
+                    if is_fresh_produce and not is_processed_product:
+                        continue
                 if requested_produce:
-                    normalized_title = title.casefold() if isinstance(title, str) else ""
                     if any(_contains_term(normalized_title, term) for term in PROCESSED_PRODUCE_TERMS):
                         continue
                     if not any(
