@@ -63,6 +63,11 @@ PROCESSED_PRODUCE_TERMS = (
     "grater", "graters", "scissor", "scissors", "cutter", "cutters",
     "chopper", "choppers", "utensil", "utensils", "kitchenware",
     "kitchen tool", "kitchen tools", "tortilla", "wrap", "wraps",
+    "rope", "clothesline", "clothes line", "drying", "balcony", "camping",
+    "rust resistant", "hook", "hooks", "meter", "spatula", "non-stick",
+    "cooking spoon", "spoon", "pans", "omelet", "dosa", "silicone",
+    "cream", "therapy", "theraphy", "skin", "moisturizer", "herbs",
+    "dog", "dogs", "pet", "treat", "treats", "jerhigh", "stix",
 )
 
 
