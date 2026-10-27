@@ -132,6 +132,34 @@ def _matches_requested_iphone(title, query, requested_model):
     )
     return requests_accessory or not is_accessory
 
+
+def _requested_fridge_search(query):
+    """Read the capacity and brand from a refrigerator search phrase."""
+    normalized = query.casefold()
+    if not any(_contains_term(normalized, term) for term in ("refrigerator", "fridge")):
+        return None
+    capacity = re.search(r"\b(\d{2,4})\s*(?:l|litres?|liters?)\b", normalized)
+    brand = "samsung" if _contains_term(normalized, "samsung") else None
+    return {"capacity": capacity.group(1) if capacity else None, "brand": brand}
+
+
+def _matches_requested_fridge(title, quantity, request, brand=""):
+    """Keep only refrigerator listings matching the requested brand and capacity."""
+    normalized = " ".join(str(part or "") for part in (title, quantity, brand)).casefold()
+    if not any(_contains_term(normalized, term) for term in ("refrigerator", "fridge")):
+        return False
+    if request["brand"] and not (
+        _contains_term(normalized, request["brand"])
+        or re.search(r"\b(?:rt|rr|rb|rf|rs|tm)\d{2}[a-z0-9/.-]*\b", normalized)
+    ):
+        return False
+    if request["capacity"]:
+        capacity_pattern = r"(?<!\d){}\s*(?:l|litres?|liters?)(?!\w)".format(
+            re.escape(request["capacity"])
+        )
+        if not re.search(capacity_pattern, normalized):
+            return False
+    return True
 def _valid_http_url(value):
     if not isinstance(value, str):
         return None
@@ -212,6 +240,7 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
         # The provider can mix props and decor into produce results.
         requested_produce = _requested_produce_groups(product_query)
         requested_iphone_model = _iphone_model_key(product_query)
+        requested_fridge = _requested_fridge_search(product_query)
         fallback_links = {
             "Amazon": "https://www.amazon.in/s?k=",
             "Flipkart": "https://www.flipkart.com/search?q=",
@@ -232,6 +261,11 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
                     continue
                 title = item.get("name") or item.get("title")
                 normalized_title = title.casefold() if isinstance(title, str) else ""
+                if requested_fridge and not _matches_requested_fridge(
+                    normalized_title, item.get("quantity"), requested_fridge,
+                    item.get("brand") or item.get("manufacturer") or ""
+                ):
+                    continue
                 if requested_iphone_model and not _matches_requested_iphone(
                     normalized_title, product_query, requested_iphone_model
                 ):
