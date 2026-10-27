@@ -99,6 +99,39 @@ def _requested_produce_groups(query):
 
 
 
+PHONE_ACCESSORY_TERMS = (
+    "case", "cover", "tempered glass", "screen protector", "screen guard",
+    "protector", "magsafe", "charger", "charging cable", "cable", "adapter",
+    "skin", "camera lens", "camera protector", "stand", "holder", "mount",
+    "wallet", "accessory", "accessories",
+)
+
+
+def _iphone_model_key(text):
+    """Return the exact iPhone generation and variant requested or listed."""
+    normalized = re.sub(r"\s+", " ", str(text).casefold().replace("-", " "))
+    match = re.search(
+        r"\biphone\s*(\d{1,2})(?:\s*(pro\s*max|pro|max|plus|mini|air|e))?\b",
+        normalized,
+    )
+    if not match:
+        return None
+    variant = re.sub(r"\s+", "", match.group(2) or "")
+    return match.group(1), variant
+
+
+def _matches_requested_iphone(title, query, requested_model):
+    """Filter other iPhone models and accessory clutter from phone searches."""
+    if _iphone_model_key(title) != requested_model:
+        return False
+    requests_accessory = any(
+        _contains_term(query.casefold(), term) for term in PHONE_ACCESSORY_TERMS
+    )
+    is_accessory = any(
+        _contains_term(title.casefold(), term) for term in PHONE_ACCESSORY_TERMS
+    )
+    return requests_accessory or not is_accessory
+
 def _valid_http_url(value):
     if not isinstance(value, str):
         return None
@@ -178,6 +211,7 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
         # Keep explicit vegetable searches relevant even when "Anything" is selected.
         # The provider can mix props and decor into produce results.
         requested_produce = _requested_produce_groups(product_query)
+        requested_iphone_model = _iphone_model_key(product_query)
         fallback_links = {
             "Amazon": "https://www.amazon.in/s?k=",
             "Flipkart": "https://www.flipkart.com/search?q=",
@@ -198,6 +232,10 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
                     continue
                 title = item.get("name") or item.get("title")
                 normalized_title = title.casefold() if isinstance(title, str) else ""
+                if requested_iphone_model and not _matches_requested_iphone(
+                    normalized_title, product_query, requested_iphone_model
+                ):
+                    continue
                 if category == "groceries":
                     is_fresh_produce = any(
                         _contains_term(normalized_title, term)
