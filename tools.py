@@ -139,7 +139,7 @@ def _coordinates_for_location(location):
         return None
 
 
-def fetch_market_data(product_query, location=None, category="all"):
+def fetch_market_data(product_query, location=None, category="all", pincode=None):
     """Fetch live offers from Amazon, Flipkart, BigBasket, Blinkit, and Zepto."""
     if not QUICKCOMMERCE_API_KEY:
         logger.error("QuickCommerce API key is not configured")
@@ -151,15 +151,19 @@ def fetch_market_data(product_query, location=None, category="all"):
         logger.warning("No India location match found for %r", location)
         return None
     try:
+        platforms = PLATFORMS + (("Minutes",) if pincode else ())
+        search_params = {
+            "q": product_query,
+            "lat": coordinates[0],
+            "lon": coordinates[1],
+            "platforms": ",".join(platforms),
+        }
+        if pincode:
+            search_params["pincode"] = pincode
         response = requests.get(
             "https://api.quickcommerceapi.com/v1/groupsearch",
             headers={"X-API-Key": QUICKCOMMERCE_API_KEY.strip()},
-            params={
-                "q": product_query,
-                "lat": coordinates[0],
-                "lon": coordinates[1],
-                "platforms": ",".join(PLATFORMS),
-            },
+            params=search_params,
             timeout=35,
         )
         response.raise_for_status()
@@ -180,8 +184,9 @@ def fetch_market_data(product_query, location=None, category="all"):
             "BigBasket": "https://www.bigbasket.com/ps/?q=",
             "BlinkIt": "https://blinkit.com/s/?q=",
             "Zepto": "https://www.zepto.com/search?query=",
+            "Minutes": "https://www.flipkart.com/flipkart-minutes-store?autoSwitchAddress=true",
         }
-        for platform in PLATFORMS:
+        for platform in platforms:
             listings = results.get(platform, [])
             if isinstance(listings, dict):
                 listings = listings.get("products", [])
@@ -240,6 +245,8 @@ def fetch_market_data(product_query, location=None, category="all"):
                     title = "{} · {}".format(title.strip(), quantity.strip())
                 platform_data = item.get("platform")
                 source = platform_data.get("name", platform) if isinstance(platform_data, dict) else platform
+                if str(source).casefold() in {"minutes", "flipkart minutes"}:
+                    source = "Flipkart Minutes"
                 deeplink = _valid_http_url(item.get("deeplink") or item.get("url"))
                 offer = {
                     "title": title.strip(),

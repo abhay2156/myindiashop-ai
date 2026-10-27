@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 
 from flask import Flask, jsonify, render_template, request
 from tools import fetch_market_data, analyze_prices_with_ai
@@ -34,6 +35,13 @@ def search_api():
     if len(location) > 120:
         return jsonify({"success": False, "error": "Please enter a shorter city or locality."}), 400
 
+    pincode = data.get("pincode", "")
+    if not isinstance(pincode, str):
+        return jsonify({"success": False, "error": "Please enter a valid 6-digit PIN code."}), 400
+    pincode = pincode.strip()
+    if pincode and not re.fullmatch(r"[0-9]{6}", pincode):
+        return jsonify({"success": False, "error": "PIN code must contain exactly 6 digits."}), 400
+
     category = data.get("category", "all")
     if not isinstance(category, str) or category not in CATEGORIES:
         return jsonify({"success": False, "error": "Please choose a valid product category."}), 400
@@ -41,7 +49,7 @@ def search_api():
     # Send only the product phrase to retailers so their search stays relevant.
     search_query = product_query
     try:
-        search_results = fetch_market_data(search_query, location=location, category=category)
+        search_results = fetch_market_data(search_query, location=location, category=category, pincode=pincode)
         if not search_results:
             return jsonify({"success": False, "error": "Could not retrieve shopping results. Please try again."}), 502
 
@@ -53,6 +61,7 @@ def search_api():
             "success": True,
             "data": structured_data,
             "location": location,
+            "pincode": pincode,
             "price_status": f"Search results targeted to {location}. Availability and final checkout price may vary by retailer.",
         }), 200
     except Exception:
