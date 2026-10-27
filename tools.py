@@ -69,7 +69,12 @@ PROCESSED_PRODUCE_TERMS = (
     "cream", "therapy", "theraphy", "skin", "moisturizer", "herbs",
     "dog", "dogs", "pet", "treat", "treats", "jerhigh", "stix",
 )
-
+NON_FOOD_PRODUCE_TERMS = (
+    "artificial", "faux", "fake", "simulation", "simulated", "prop", "props",
+    "display", "decor", "decoration", "decorative", "showcase", "cabinet",
+    "ornament", "ornamental", "toy", "toys", "plastic", "craft", "replica",
+    "model", "dollhouse", "home decor",
+)
 
 def _contains_term(text, term):
     return re.search(r"(?<!\w)" + re.escape(term) + r"(?!\w)", text) is not None
@@ -162,7 +167,9 @@ def fetch_market_data(product_query, location=None, category="all"):
             return None
 
         offers = []
-        requested_produce = _requested_produce_groups(product_query) if category == "fresh_vegetables" else []
+        # Keep explicit vegetable searches relevant even when "Anything" is selected.
+        # The provider can mix props and decor into produce results.
+        requested_produce = _requested_produce_groups(product_query)
         fallback_links = {
             "Amazon": "https://www.amazon.in/s?k=",
             "Flipkart": "https://www.flipkart.com/search?q=",
@@ -194,7 +201,10 @@ def fetch_market_data(product_query, location=None, category="all"):
                     if is_fresh_produce and not is_processed_product:
                         continue
                 if requested_produce:
-                    if any(_contains_term(normalized_title, term) for term in PROCESSED_PRODUCE_TERMS):
+                    if any(
+                        _contains_term(normalized_title, term)
+                        for term in (*PROCESSED_PRODUCE_TERMS, *NON_FOOD_PRODUCE_TERMS)
+                    ):
                         continue
                     if not any(
                         any(_contains_term(normalized_title, term) for term in group)
