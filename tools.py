@@ -73,6 +73,8 @@ NON_FOOD_PRODUCE_TERMS = (
     "artificial", "faux", "fake", "simulation", "simulated", "prop", "props",
     "display", "decor", "decoration", "decorative", "showcase", "cabinet",
     "ornament", "ornamental", "toy", "toys", "plastic", "craft", "replica",
+    "cloth", "clothes", "microfiber", "microfibre", "cleaning", "towel", "washable",
+    "textile", "fabric", "mop", "sponge", "scrub", "wiping", "rag", "duster",
     "model", "dollhouse", "home decor",
 )
 
