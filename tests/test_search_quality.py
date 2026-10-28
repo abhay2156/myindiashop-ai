@@ -23,8 +23,9 @@ class SearchQualityTests(unittest.TestCase):
     def test_home_page_uses_structured_category_controls(self):
         template = (Path(__file__).parents[1] / "templates" / "index.html").read_text(encoding="utf-8")
         self.assertIn("What are you shopping for?", template)
-        self.assertEqual(template.count('class="category"'), 6)
+        self.assertEqual(template.count('<li><button class="category"'), 6)
         self.assertNotIn(">hat are you shopping for?", template)
+        self.assertEqual(template.count("<br>"), 3)
 
     @patch("tools._coordinates_for_location", return_value=(25.6, 85.1))
     @patch("tools.requests.get")
