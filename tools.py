@@ -1,3 +1,4 @@
+import html
 import json
 import logging
 import os
@@ -106,6 +107,10 @@ PHONE_ACCESSORY_TERMS = (
     "wallet", "accessory", "accessories",
 )
 
+IPHONE_BUNDLE_TERMS = (
+    "apple care", "applecare", "protection plan", "care plan",
+)
+
 
 def _iphone_model_key(text):
     """Return the exact iPhone generation and variant requested or listed."""
@@ -121,7 +126,7 @@ def _iphone_model_key(text):
 
 
 def _matches_requested_iphone(title, query, requested_model):
-    """Filter other iPhone models and accessory clutter from phone searches."""
+    """Filter other models, accessories, and unrequested warranty bundles."""
     if _iphone_model_key(title) != requested_model:
         return False
     requests_accessory = any(
@@ -130,7 +135,36 @@ def _matches_requested_iphone(title, query, requested_model):
     is_accessory = any(
         _contains_term(title.casefold(), term) for term in PHONE_ACCESSORY_TERMS
     )
-    return requests_accessory or not is_accessory
+    requests_bundle = any(
+        _contains_term(query.casefold(), term) for term in IPHONE_BUNDLE_TERMS
+    )
+    is_bundle = any(
+        _contains_term(title.casefold(), term) for term in IPHONE_BUNDLE_TERMS
+    )
+    return (requests_accessory or not is_accessory) and (requests_bundle or not is_bundle)
+
+
+def _clean_product_title(value):
+    """Decode provider entities as text; the frontend escapes it before HTML use."""
+    if not isinstance(value, str):
+        return ""
+    return html.unescape(value).strip()
+
+
+def _usable_delivery_estimate(value):
+    """Keep relative delivery estimates; suppress ambiguous weekday/date labels."""
+    if not isinstance(value, str):
+        return ""
+    estimate = value.strip()
+    if not estimate:
+        return ""
+    normalized = estimate.casefold()
+    relative_terms = (
+        "today", "tomorrow", "same day", "within", "in ", "minutes", "mins",
+        "hours", "hrs", "business day", "working day", "day delivery",
+    )
+    duration = re.search(r"\b\d+(?:\s*[-–]\s*\d+)?\s*(?:minutes?|mins?|hours?|hrs?|days?)\b", normalized)
+    return estimate if duration or any(term in normalized for term in relative_terms) else ""
 
 
 def _requested_fridge_search(query):
@@ -259,7 +293,7 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
             for item in listings:
                 if not isinstance(item, dict) or item.get("available") is False:
                     continue
-                title = item.get("name") or item.get("title")
+                title = _clean_product_title(item.get("name") or item.get("title"))
                 normalized_title = title.casefold() if isinstance(title, str) else ""
                 if requested_fridge and not _matches_requested_fridge(
                     normalized_title, item.get("quantity"), requested_fridge,
@@ -326,8 +360,10 @@ def fetch_market_data(product_query, location=None, category="all", pincode=None
                     "source": str(source),
                     "productLink": deeplink or fallback_links[platform] + quote_plus(title.strip()),
                 }
-                if isinstance(platform_data, dict) and isinstance(platform_data.get("sla"), str):
-                    offer["delivery"] = platform_data["sla"]
+                if isinstance(platform_data, dict):
+                    delivery = _usable_delivery_estimate(platform_data.get("sla"))
+                    if delivery:
+                        offer["delivery"] = delivery
                 if isinstance(item.get("rating"), (int, float)):
                     offer["rating"] = item["rating"]
                 count = item.get("rating_count", item.get("ratingCount"))
