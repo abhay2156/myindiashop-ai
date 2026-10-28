@@ -12,6 +12,11 @@ CATEGORIES = {"groceries", "fresh_vegetables", "electronics", "fashion", "househ
 
 
 @app.route("/", methods=["GET"])
+def landing():
+    return render_template("landing.html")
+
+
+@app.route("/shop", methods=["GET"])
 def index():
     return render_template("index.html")
 
